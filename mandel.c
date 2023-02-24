@@ -1,11 +1,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <mpi.h>
 
 #define MAX_ITER 1000
 
-int main() {
+int main(int argc, char **argv) {
+    MPI_Init(&argc, &argv);
     // Set the size and resolution of the image
+    int rank, size;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    double start_time=MPI_Wtime();
     int width = 800;
     int height = 600;
     double x_min = -2.0;
@@ -53,8 +59,12 @@ int main() {
     fwrite(image, sizeof(unsigned char), width * height, file);
     fclose(file);
 
+	double end_time = MPI_Wtime();
+	double elapsed_time = end_time - start_time;
+	printf("Elapsed time: %f seconds\n", elapsed_time);
+	
     // Free the memory used by the image
     free(image);
-
+    MPI_Finalize();
     return 0;
 }
