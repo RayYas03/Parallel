@@ -1,18 +1,18 @@
-#include <stdio.h>
 #include <mpi.h>
+#include <stdio.h>
 
-int main(int argc, char** argv){
-    int process_Rank, size_Of_Comm;
-    int distro_Array[4] = {39, 72, 129, 42};
-    int scattered_Data;
-
+int main(int argc, char** argv) {
+    // Initialize MPI
     MPI_Init(&argc, &argv);
-    MPI_Comm_size(MPI_COMM_WORLD, &size_Of_Comm);
-    MPI_Comm_rank(MPI_COMM_WORLD, &process_Rank);
 
-    MPI_Scatter(&distro_Array, 1, MPI_INT, &scattered_Data, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    // Get the rank of the current process
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    printf("Process has received: %d \n", scattered_Data);
-MPI_Finalize();
-return 0;
+    // Print the rank of the current process
+    printf("Hello world from process %d\n", rank);
+
+    // Finalize MPI
+    MPI_Finalize();
+    return 0;
 }
