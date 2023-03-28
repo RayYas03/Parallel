@@ -1,70 +1,71 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #include <omp.h>
-#include <sys/time.h>
 
 #define M 1000
 #define N 1000
 #define K 1000
 
+int A[M][K], B[K][N], C[M][N];
+
 int main() {
-    int *A = (int *)malloc(M * K * sizeof(int));
-    int *B = (int *)malloc(K * N * sizeof(int));
-    int *C = (int *)calloc(M * N, sizeof(int));
-
-    // Initialize matrices A and B
-    for (int i = 0; i < M * K; i++) {
-        A[i] = rand() % 10;
-    }
-
-    for (int i = 0; i < K * N; i++) {
-        B[i] = rand() % 10;
-    }
-
-    // Measure time taken by sequential algorithm
-    struct timeval start_time, end_time;
-    gettimeofday(&start_time, NULL);
-
+    // initialize matrices A and B with random values
+    srand(time(NULL));
     for (int i = 0; i < M; i++) {
+        for (int j = 0; j < K; j++) {
+            A[i][j] = rand() % 10;
+        }
+    }
+    for (int i = 0; i < K; i++) {
         for (int j = 0; j < N; j++) {
-            for (int k = 0; k < K; k++) {
-                C[i * N + j] += A[i * K + k] * B[k * N + j];
-            }
+            B[i][j] = rand() % 10;
         }
     }
 
-    gettimeofday(&end_time, NULL);
-    double seq_time = (end_time.tv_sec - start_time.tv_sec) + (end_time.tv_usec - start_time.tv_usec) / 1000000.0;
-
-    printf("Sequential algorithm took %f seconds\n", seq_time);
-
-    // Measure time taken by parallel algorithm
-    gettimeofday(&start_time, NULL);
-
-    #pragma omp parallel for
-    for (int i = 0; i < M; i++) {
-        for (int j = 0; j < N; j++) {
-            for (int k = 0; k < K; k++) {
-                C[i * N + j] += A[i * K + k] * B[k * N + j];
+    // perform matrix multiplication in parallel
+    clock_t start = clock();
+    int T = omp_get_max_threads();
+    #pragma omp parallel num_threads(T)
+    {
+        int id = omp_get_thread_num();
+        int start = id * M / T;
+        int end = (id + 1) * M / T;
+        for (int i = start; i < end; i++) {
+            for (int j = 0; j < N; j++) {
+                for (int k = 0; k < K; k++) {
+                    C[i][j] += A[i][k] * B[k][j];
+                }
             }
         }
     }
+    clock_t end = clock();
+    double par_time = (double)(end - start) / CLOCKS_PER_SEC;
 
-    gettimeofday(&end_time, NULL);
-    double par_time = (end_time.tv_sec - start_time.tv_sec) + (end_time.tv_usec - start_time.tv_usec) / 1000000.0;
+    // print resulting matrix C
+    // for (int i = 0; i < M; i++) {
+    //     for (int j = 0; j < N; j++) {
+    //         printf("%d ", C[i][j]);
+    //     }
+    //     printf("\n");
+    // }
 
-    printf("Parallel algorithm took %f seconds\n", par_time);
+    // performance metrics
+    start = clock();
+    for (int i = 0; i < M; i++) {
+        for (int j = 0; j < N; j++) {
+            for (int k = 0; k < K; k++) {
+                C[i][j] += A[i][k] * B[k][j];
+            }
+        }
+    }
+    end = clock();
+    double seq_time = (double)(end - start) / CLOCKS_PER_SEC;
 
-    // Compute performance metrics
-    double speedup = seq_time / par_time;
-    double efficiency = speedup / omp_get_max_threads();
-    printf("Speedup factor: %f\n", speedup);
-    printf("Efficiency: %f\n", efficiency);
-
-    // Free memory
-    free(A);
-    free(B);
-    free(C);
+    printf("Sequential time: %f seconds\n", seq_time);
+    printf("Parallel time: %f seconds\n", par_time);
+    printf("Speedup factor: %f\n", seq_time / par_time);
+    printf("Efficiency: %f%%\n", (seq_time / par_time) / T * 100);
 
     return 0;
 }
