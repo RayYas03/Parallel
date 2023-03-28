@@ -2,100 +2,96 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <time.h>
-#include <stdint.h>
 
-#define M 500
-#define N 500
-#define P 500
-#define NUM_THREADS 4
+#define M 1000
+#define N 1000
+#define K 1000
+#define T 4
 
-int A[M][N], B[N][P], C[M][P];
-pthread_mutex_t mutex;
+int A[M][K];
+int B[K][N];
+int C[M][N];
 
-void sequential_matrix_multiply() {
-    int i, j, k, sum;
-    for (i = 0; i < M; i++) {
-        for (j = 0; j < P; j++) {
-            sum = 0;
-            for (k = 0; k < N; k++) {
-                sum += A[i][k] * B[k][j];
+void *multiply(void *arg) {
+    int tid = *(int *)arg;
+    int start = tid * (M / T);
+    int end = (tid + 1) * (M / T);
+
+    for (int i = start; i < end; i++) {
+        for (int j = 0; j < N; j++) {
+            for (int k = 0; k < K; k++) {
+                C[i][j] += A[i][k] * B[k][j];
             }
-            C[i][j] = sum;
-        }
-    }
-}
-
-void *matrix_multiply(void *thread_id) {
-    intptr_t tid = (intptr_t) thread_id;
-    int i, j, k, start, end, sum;
-    start = (M/NUM_THREADS) * tid;
-    end = (tid == NUM_THREADS-1) ? M : (M/NUM_THREADS)*(tid+1);
-    for (i = start; i < end; i++) {
-        for (j = 0; j < P; j++) {
-            sum = 0;
-            for (k = 0; k < N; k++) {
-                sum += A[i][k] * B[k][j];
-            }
-            pthread_mutex_lock(&mutex);
-            C[i][j] = sum;
-            pthread_mutex_unlock(&mutex);
         }
     }
     pthread_exit(NULL);
 }
 
 int main() {
-    int i, j, rc;
-    pthread_t threads[NUM_THREADS];
-    pthread_mutex_init(&mutex, NULL);
-    // Initialize matrices A and B
-    for (i = 0; i < M; i++) {
-        for (j = 0; j < N; j++) {
-            A[i][j] = i*N + j;
-            B[j][i] = i*N + j;
+    pthread_t threads[T];
+    int thread_ids[T];
+
+    // initialize A and B matrices
+    for (int i = 0; i < M; i++) {
+        for (int j = 0; j < K; j++) {
+            A[i][j] = rand() % 100;
+        }
+    }
+    for (int i = 0; i < K; i++) {
+        for (int j = 0; j < N; j++) {
+            B[i][j] = rand() % 100;
         }
     }
 
-    // Sequential matrix multiplication
-    clock_t start = clock();
-    sequential_matrix_multiply();
-    clock_t end = clock();
-    double sequential_time = (double)(end - start) / CLOCKS_PER_SEC;
-
-    // Parallel matrix multiplication
-    start = clock();
-    for (i = 0; i < NUM_THREADS; i++) {
-        rc = pthread_create(&threads[i], NULL, matrix_multiply, (void *)(intptr_t) i);
-        if (rc) {
-            printf("Error: return code from pthread_create() is %d\n", rc);
-            exit(-1);
-        }
+    // create threads
+    for (int i = 0; i < T; i++) {
+        thread_ids[i] = i;
+        pthread_create(&threads[i], NULL, multiply, &thread_ids[i]);
     }
-    for (i = 0; i < NUM_THREADS; i++) {
+
+    // join threads
+    for (int i = 0; i < T; i++) {
         pthread_join(threads[i], NULL);
     }
-    end = clock();
-    double parallel_time = (double)(end - start) / CLOCKS_PER_SEC;
 
-    // Print result matrix C
-    /*
-    printf("Result matrix C:\n");
-    for (i = 0; i < M; i++) {
-        for (j = 0; j < P; j++) {
-            printf("%d ", C[i][j]);
+    // print resulting matrix C
+    // for (int i = 0; i < M; i++) {
+    //     for (int j = 0; j < N; j++) {
+    //         printf("%d ", C[i][j]);
+    //     }
+    //     printf("\n");
+    // }
+
+    // performance metrics
+    clock_t start = clock();
+    for (int i = 0; i < M; i++) {
+    for (int j = 0; j < N; j++) {
+        for (int k = 0; k < K; k++) {
+            C[i][j] += A[i][k] * B[k][j];
         }
-        printf("\n");
     }
-    */
+}
+clock_t end = clock();
+double seq_time = (double)(end - start) / CLOCKS_PER_SEC;
 
-    // Calculate speedup and efficiency
-    double speedup = sequential_time / parallel_time;
-    double efficiency = speedup / NUM_THREADS;
+start = clock();
+// create threads
+for (int i = 0; i < T; i++) {
+    thread_ids[i] = i;
+    pthread_create(&threads[i], NULL, multiply, &thread_ids[i]);
+}
 
-    printf("Sequential time: %lf seconds\n", sequential_time);
-    printf("Parallel time: %lf seconds\n", parallel_time);
-    printf("Speedup: %lf\n", speedup);
-    printf("Efficiency: %f\n", efficiency);
-    
-    return 0;
-    }
+// join threads
+for (int i = 0; i < T; i++) {
+    pthread_join(threads[i], NULL);
+}
+end = clock();
+double par_time = (double)(end - start) / CLOCKS_PER_SEC;
+printf("Sequential time: %f seconds\n", seq_time);
+printf("Parallel time: %f seconds\n", par_time);
+printf("Speedup factor: %f\n", seq_time / par_time);
+printf("Efficiency: %f%%\n", (seq_time / par_time) / T * 100);
+
+return 0;
+}
+   
